@@ -1,14 +1,10 @@
 import librosa
 import numpy as np
 import scipy
-<<<<<<< HEAD
 import torch
 from mir_eval.separation import bss_eval_sources 
-=======
-#from mir_eval.separation import bss_eval_sources
 import os
 import json
->>>>>>> f9bfc7efe60e38e4418e30e17ba2fc3ef628fdf9
 
 def load_wav(filename, sr=16000):
 	'''
