@@ -1,8 +1,14 @@
 import librosa
 import numpy as np
 import scipy
+<<<<<<< HEAD
 import torch
 from mir_eval.separation import bss_eval_sources 
+=======
+#from mir_eval.separation import bss_eval_sources
+import os
+import json
+>>>>>>> f9bfc7efe60e38e4418e30e17ba2fc3ef628fdf9
 
 def load_wav(filename, sr=16000):
 	'''
@@ -76,7 +82,36 @@ def bss_eval(mixed_wav, src1_wav, src2_wav, pred_src1_wav, pred_src2_wav):
     nsdr = sdr - sdr_mixed
     return nsdr, sir, sar, len
 
+def split():
+	root = "data/MIR-1K/"
+	dataset = "MIR-1K"
 
+	data_path = root + "Wavfile"
+	file_list = os.listdir(data_path)
+
+
+	origin_index = list(range(0, len(file_list)))
+	train_ids = np.random.choice(origin_index, 800, replace=False)
+	origin_index = [x for x in origin_index if x not in train_ids]
+	test_ids = np.random.choice(origin_index, 100, replace=False)
+	origin_index = [x for x in origin_index if x not in test_ids]
+	val_ids = np.random.choice(origin_index, 100, replace=False)
+	
+	train_list = np.array(file_list)[train_ids]
+	test_list = np.array(file_list)[test_ids]
+	val_list = np.array(file_list)[val_ids]
+
+	train_path = root + dataset + "_train.json"
+	test_path = root + dataset + "_test.json"
+	val_path = root + dataset + "_val.json"
+
+	print("Saving testing , training ,validation json files...")
+	with open (train_path, "w") as f:
+		json.dump(train_list.tolist(), f)
+	with open (test_path, "w") as f:
+		json.dump(test_list.tolist(), f)
+	with open (val_path, "w") as f:
+		json.dump(val_list.tolist(), f)
 
 class Scorekeeper():
 	def __init__(self):
@@ -94,4 +129,10 @@ class Scorekeeper():
 	def print_score(self):
 		print("GNSDR: {},\n GSIR: {},\n GSAR: {}".format
 			(self.gnsdr/self.total_len, self.gsir/self.total_len, self.gsar/self.total_len))
+
+def main():
+	split()
+
+if __name__ == "__main__":
+	main()
 		
