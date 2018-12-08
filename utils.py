@@ -1,6 +1,7 @@
 import librosa
 import numpy as np
 import scipy
+import torch
 from mir_eval.separation import bss_eval_sources 
 
 def load_wav(filename, sr=16000):
@@ -23,6 +24,28 @@ def reconstruct_wav(mag, phase, hop_length=256):
 
 def get_spec(wav, n_fft=1024, window="hamming", hop_length=256):
 	return librosa.stft(wav, window=window, n_fft=n_fft, hop_length=hop_length)
+
+def get_batch_spec(mixed, s1, s2):
+	mixed_stft = list()
+	s1_stft = list()
+	s2_stft = list()
+
+	for mix_, s1_, s2_ in zip(mixed, s1, s2):
+		mixed_stft.append(get_spec(mix_))
+		s1_stft.append(get_spec(s1_))
+		s2_stft.append(get_spec(s2_))
+
+	mixed_stft = np.array(mixed_stft)
+	s1_stft = np.array(s1_stft)
+	s2_stft = np.array(s2_stft)
+
+	mixed_stft = mixed_stft.transpose((0,2,1))
+	s1_stft = s1_stft.transpose((0,2,1))
+	s2_stft = s2_stft.transpose((0,2,1))
+
+	return mixed_stft, s1_stft, s2_stft
+
+
 
 def get_angle(spec):
 	return np.angle(spec)
