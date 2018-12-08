@@ -15,14 +15,13 @@ def load_wav(filename, sr=16000):
 	s1, s2 = data[0,:], data[1,:]
 	return mixed, s1, s2
 
-def reconstruct_wav(mag, phase, hop_length=256):
+def combine_mag_phase(mag, phase, hop_length=256):
 	'''
 	using istft to reconstruct the wav format
 	'''
 	new_phase = np.exp(1.j * phase)
-	new_wav = librosa.istft(mag*new_phase, hop_length=hop_length)
 
-	return new_wav
+	return mag*new_phase
 
 def get_spec(wav, n_fft=1024, window="hamming", hop_length=256):
 	return librosa.stft(wav, window=window, n_fft=n_fft, hop_length=hop_length)
@@ -79,7 +78,7 @@ def bss_eval(mixed_wav, src1_wav, src2_wav, pred_src1_wav, pred_src2_wav):
     return nsdr, sir, sar, len
 
 def split():
-	root = "data/MIR-1K/"
+	root = "./data/MIR-1K/"
 	dataset = "MIR-1K"
 
 	data_path = root + "Wavfile"

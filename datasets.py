@@ -4,19 +4,22 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 from utils import load_wav
 from torchvision import transforms
-from utils import reconstruct_wav, get_spec, get_angle, get_mag, save_wav, bss_eval
-
+from utils import get_spec, get_angle, get_mag, save_wav, bss_eval
+import json
 
 
 class MIR1K(Dataset):
 
-	def __init__(self, root, sr=16000, transform=None):
+	def __init__(self, root, mode="train", sr=16000, transform=None):
 		self.root = root
 		self.transform = transform
 		self.wavfiles = []
 		self.sr = 16000
+		self.filenames_json = "./data/MIR-1K/MIR-1K_"+mode+".json"
+		with open(self.filenames_json, "r") as f:
+			self.filenames = json.load(f)
 		for (root, dirs, files) in os.walk(root):
-			self.wavfiles.extend(['{}/{}'.format(root, f) for f in files if f.endswith('.wav')])
+			self.wavfiles.extend(['{}/{}'.format(root, f) for f in self.filenames if f.endswith('.wav')])
 
 	def __getitem__(self, index):
 		'''
@@ -49,9 +52,10 @@ def collate_fn(data):
 	return new_mixed, new_s1, new_s2, lengths
 
 
-def get_dataloader(batch_size=4, shuffle=True, num_workers=0):
-	mir1k_data_path = "../data/MIR-1K/Wavfile"
-	dataset = MIR1K(root=mir1k_data_path)
+def get_dataloader(mode="train", batch_size=4, shuffle=True, num_workers=0):
+	mir1k_data_path = "./data/MIR-1K/Wavfile"
+	dataset = MIR1K(root=mir1k_data_path, mode=mode)
+	print(len(dataset))
 	dataloader = DataLoader(dataset=dataset,
 							batch_size=batch_size,
 							shuffle=shuffle,
@@ -61,20 +65,21 @@ def get_dataloader(batch_size=4, shuffle=True, num_workers=0):
 	return dataloader
 
 def main():
-	mir1k_data_path = "../data/MIR-1K/Wavfile"
-	dataset = MIR1K(root=mir1k_data_path)
-	dataloader = DataLoader(dataset=dataset,
-							batch_size=4,
-							shuffle=True,
-							num_workers=0,
-							collate_fn=collate_fn
-							)
-	import time
-	start_time = time.time()
-	for batch_idx, (mixed, s1, s2, lengths) in enumerate(dataloader):
-		print("{}/{}".format(batch_idx, len(dataloader)))
+	mir1k_data_path = "./data/MIR-1K/Wavfile"
+	dataset = MIR1K(root=mir1k_data_path, mode="test")
+	print(len(dataset))
+	# dataloader = DataLoader(dataset=dataset,
+	# 						batch_size=4,
+	# 						shuffle=True,
+	# 						num_workers=0,
+	# 						collate_fn=collate_fn
+	# 						)
+	# import time
+	# start_time = time.time()
+	# for batch_idx, (mixed, s1, s2, lengths) in enumerate(dataloader):
+	# 	print("{}/{}".format(batch_idx, len(dataloader)))
 
-	print(time.time()-start_time)
+	# print(time.time()-start_time)
 	
 	
 if __name__ == "__main__":

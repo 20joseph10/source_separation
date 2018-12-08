@@ -96,16 +96,19 @@ class Model(nn.Module):
 		pass
 	def forward(self, x):
 		
-		output = self.rnn(x)[0]
-		
-		s1 = self.linear1(output)
-		s2 = self.linear2(output)
-
+		output, states = self.rnn(x)
+		# print(output.shape)
+		s1 = F.relu(self.linear1(output)) # add relu later?
+		s2 = F.relu(self.linear2(output))
+		# print(x.shape)
+		# print(s1.shape)
+		# soft time frequency mask
+		s1 = s1 / (s1+s2+1e-16)*x
+		s2 = s2 / (s1+s2+1e-16)*x
+		# print(s1.shape)
 		return s1, s2
 
-		
-
-
+	
 
 def time_freq_masking(M_stft, L_hat, S_hat, gain=3):
 	mask = np.abs(S_hat) - gain * np.abs(L_hat)
