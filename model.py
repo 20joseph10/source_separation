@@ -1,11 +1,9 @@
 import numpy as np
-
-
-
-
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 class R_pca:
-
     def __init__(self, D, mu=None, lmbda=None):
         self.D = D
         self.S = np.zeros(self.D.shape)
@@ -87,6 +85,26 @@ class R_pca:
             plt.plot(self.L[n, :], 'b')
             if not axis_on:
                 plt.axis('off')
+
+class Model(nn.Module):
+	def __init__(self, input_size, hidden_size):
+		super(Model, self).__init__()
+		self.rnn = nn.LSTM(input_size, hidden_size, batch_first=True)
+		self.linear1 = nn.Linear(hidden, input_size)
+		self.linear2 = nn.Linear(hidden, input_size)
+	def init_weights(self):
+		pass
+
+	def forward(self, x):
+		output = self.rnn(x)
+		s1 = self.linear1(output)
+		s2 = self.linear2(output)
+
+		return s1, s2
+
+		
+
+
 
 def time_freq_masking(M_stft, L_hat, S_hat, gain=3):
     mask = np.abs(S_hat) - gain * np.abs(L_hat)

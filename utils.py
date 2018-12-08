@@ -55,4 +55,20 @@ def bss_eval(mixed_wav, src1_wav, src2_wav, pred_src1_wav, pred_src2_wav):
 
 
 
+class Scorekeeper():
+	def __init__(self):
+		self.total_len = 0.
+		self.gnsdr = 0.
+		self.gsir = 0.
+		self.gsar = 0.
 
+	def update(self, nsdr, sir, sar, lens):
+		self.total_len += lens
+		self.gnsdr += nsdr*lens
+		self.gsir += sir*lens
+		self.gsar += sar*lens
+
+	def print_score(self):
+		print("GNSDR: {},\n GSIR: {},\n GSAR: {}".format
+			(self.gnsdr/self.total_len, self.gsir/self.total_len, self.gsar/self.total_len))
+		
