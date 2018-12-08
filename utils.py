@@ -2,7 +2,7 @@ import librosa
 import numpy as np
 import scipy
 import torch
-from mir_eval.separation import bss_eval_sources 
+from mir_eval.separation import bss_eval_sources
 import os
 import json
 
@@ -91,7 +91,7 @@ def split():
 	test_ids = np.random.choice(origin_index, 100, replace=False)
 	origin_index = [x for x in origin_index if x not in test_ids]
 	val_ids = np.random.choice(origin_index, 100, replace=False)
-	
+
 	train_list = np.array(file_list)[train_ids]
 	test_list = np.array(file_list)[test_ids]
 	val_list = np.array(file_list)[val_ids]
