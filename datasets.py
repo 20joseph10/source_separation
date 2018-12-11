@@ -55,7 +55,6 @@ def collate_fn(data):
 def get_dataloader(mode="train", batch_size=4, shuffle=True, num_workers=0):
 	mir1k_data_path = "./data/MIR-1K/Wavfile"
 	dataset = MIR1K(root=mir1k_data_path, mode=mode)
-	print(len(dataset))
 	dataloader = DataLoader(dataset=dataset,
 							batch_size=batch_size,
 							shuffle=shuffle,
