@@ -32,7 +32,7 @@ def demo():
     with open(test_path, 'r') as text_file:
         content = json.load(text_file)
     wav_filenames = ["{}/{}".format("data/MIR1K/MIR-1K/Wavfile", f) for f in content]
-    wav_filenames = wav_filenames[:2]#["../HW3/sample_music.wav"] # only get the first two for demo
+    wav_filenames = ["../HW3/sample_music.wav"] # only get the first two for demo
     
     wavs_mono, wavs_src1, wavs_src2 = load_wavs(filenames = wav_filenames, sr = mir1k_sr)
 

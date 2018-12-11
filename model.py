@@ -92,19 +92,29 @@ class Model(nn.Module):
 		self.rnn = nn.GRU(input_size, hidden_size, num_layers=3, batch_first=True, dropout=0.25)
 		self.linear1 = nn.Linear(hidden_size, input_size)
 		self.linear2 = nn.Linear(hidden_size, input_size)
-
-		self.linear_mask1 = nn.Linear(input_size, input_size)
-		self.linear_mask2 = nn.Linear(input_size, input_size)
+		self.dropout = nn.Dropout(0.25)
+		# self.linear_mask1 = nn.Linear(input_size, input_size)
+		# self.linear_mask2 = nn.Linear(input_size, input_size)
+		self.fc1 = nn.Linear(input_size, 256)
+		self.fc2 = nn.Linear(256, 128)
+		self.combine = nn.Linear(input_size+128, input_size)
 	def forward(self, x):
-		output, states = self.rnn(x)
+		# print(x.shape)
+		x = self.dropout(x)
+		att = F.relu(self.fc1(x))
+		att = F.relu(self.fc2(att))
+		rnn_in = torch.cat((att, x), 2)
+		rnn_in = F.relu(self.combine(rnn_in))
+		output, states = self.rnn(rnn_in)
+		# output = output + att
 		s1 = F.relu(self.linear1(output))
 		s2 = F.relu(self.linear2(output))
 
 		# soft time frequency mask
 		mask1 = torch.abs(s1) / (torch.abs(s1)+torch.abs(s2)+1e-16)
 		mask2 = torch.abs(s2) / (torch.abs(s1)+torch.abs(s2)+1e-16)
-		mask1 = self.linear_mask1(mask1) + mask1
-		mask2 = self.linear_mask2(mask2) + mask2 
+		# # mask1 = self.linear_mask1(mask1) + mask1
+		# # mask2 = self.linear_mask2(mask2) + mask2 
 		s1 = mask1*x
 		s2 = mask2*x
 		return s1, s2

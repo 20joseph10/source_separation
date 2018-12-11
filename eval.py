@@ -34,7 +34,7 @@ def eval_rnn():
     mixed, s1, s2 = load_wavs(filenames)
     mixed_stft, s1_stft, s2_stft = get_specs_transpose(mixed, s1, s2)
     
-    checkpoint = torch.load("final_model.pth")
+    checkpoint = torch.load("model_80000.pth")
     model = Model(513, 256).to(device)
     model.load_state_dict(checkpoint["model_state_dict"])
 
@@ -105,8 +105,8 @@ def eval():
     checkpoint = torch.load("final_model.pth")
 
     mir1k_dir = 'data/MIR1K/MIR-1K'
-    # test_path = os.path.join(mir1k_dir, 'test.txt')
-    test_path = os.path.join(mir1k_dir, 'MIR-1K_test.json')
+    test_path = os.path.join(mir1k_dir, 'test_temp.json')
+    #test_path = os.path.join(mir1k_dir, 'MIR-1K_test.json')
 
     with open(test_path, 'r') as text_file:
         content = json.load(text_file)

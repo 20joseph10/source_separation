@@ -46,9 +46,9 @@ def train_rnn():
     mir1k_dir = 'data/MIR1K/MIR-1K'
 
     # train_path = os.path.join(mir1k_dir, 'train.txt')
-    train_path = os.path.join(mir1k_dir, 'MIR-1K_train.json')
-
-    valid_path = os.path.join(mir1k_dir, 'MIR-1K_val.json')
+    # train_path = os.path.join(mir1k_dir, 'MIR-1K_train.json')
+    train_path = os.path.join(mir1k_dir, 'train_temp.json')
+    valid_path = os.path.join(mir1k_dir, 'val_temp.json')
     
     wav_filenames_train = []
     # with open(train_path, 'r') as text_file:
@@ -57,7 +57,7 @@ def train_rnn():
     with open(train_path, 'r') as f:
         content = json.load(f)
     wav_filenames_train = np.array(["{}/{}".format("data/MIR1K/MIR-1K/Wavfile", f) for f in content])
-    
+   
     
     with open(valid_path, 'r') as text_file:
         content = json.load(text_file)
@@ -73,7 +73,7 @@ def train_rnn():
     num_hidden_units = 256
     batch_size = 64
     sample_frames = 10
-    iterations = 50000
+    iterations = 100000
     
     train_log_filename = 'train_log_temp.csv'
     clear_tensorboard = False
@@ -85,7 +85,8 @@ def train_rnn():
     # print(len(wavs_mono_train))
     # Turn waves to spectrums
     # print(len(wavs_mono_train))
-    random_wavs = np.random.choice(len(wav_filenames_train), 200, replace=False)
+    split_size = int(len(wav_filenames_train)/4)
+    random_wavs = np.random.choice(len(wav_filenames_train), split_size, replace=False)
     wavs_mono_train, wavs_src1_train, wavs_src2_train = load_wavs(filenames = wav_filenames_train[random_wavs], sr = mir1k_sr)
 
     stfts_mono_train, stfts_src1_train, stfts_src2_train = wavs_to_specs(
@@ -100,7 +101,7 @@ def train_rnn():
 
     losses = []
     step = 1.
-    split_size = len(wav_filenames_train)/4
+    
     # Start training
     start_time = time.time()
     total_loss = 0.
@@ -158,7 +159,17 @@ def train_rnn():
                     val_losses += loss.cpu().numpy()
             with open(train_log_filename, "a") as f:
                 f.write("{}, {}, {}\n".format(i, loss.item(), val_losses/len(mixed_stft)))
-            random_wavs = np.random.choice(len(wav_filenames_train), 200, replace=False)
+
+            if i % 10000==0:
+                torch.save({
+                    'epoch': i,
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'loss': losses
+                }, "model_"+str(i)+".pth")
+            wavs_mono_valid, wavs_src1_valid, wavs_src2_valid = None, None, None
+            mixed_stft, s1_stft, s2_stft = None, None, None
+            random_wavs = np.random.choice(len(wav_filenames_train), split_size, replace=False)
             wavs_mono_train, wavs_src1_train, wavs_src2_train = load_wavs(filenames = wav_filenames_train[random_wavs], sr = mir1k_sr)
 
             stfts_mono_train, stfts_src1_train, stfts_src2_train = wavs_to_specs(
