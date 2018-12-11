@@ -175,9 +175,9 @@ def split():
 	with open (val_path, "w") as f:
 		json.dump(val_list.tolist(), f)
 		
-def sperate_magnitude_phase(data):
-
-    return np.abs(data), np.angle(data)
+# def sperate_magnitude_phase(data):
+#
+#     return np.abs(data), np.angle(data)
 
 def sample_data_batch(stfts_mono, stfts_src1, stfts_src2, batch_size = 64, sample_frames = 8):
 
