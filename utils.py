@@ -26,6 +26,9 @@ def load_wavs(filenames, sr=16000):
 		s2_list.append(s2)
 	return mixed_list, s1_list, s2_list
 
+def sperate_magnitude_phase(data):
+
+    return np.abs(data), np.angle(data)
 def prepare_data_full(stfts_mono, stfts_src1, stfts_src2):
 
     stfts_mono_full = list()
