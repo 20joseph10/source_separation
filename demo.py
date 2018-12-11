@@ -12,8 +12,8 @@ import os
 from mir_eval.separation import bss_eval_sources
 from model import R_pca, time_freq_masking, Model, separate_signal_with_RPCA
 from datasets import get_dataloader
-from utils import get_spec, get_angle, get_mag, save_wav, bss_eval, Scorekeeper, get_batch_spec, combine_mag_phase, load_wavs, get_specs_transpose
-from preprocess import load_wavs, prepare_data_full, wavs_to_specs, sperate_magnitude_phase, combine_magnitdue_phase
+from utils import get_spec, get_angle, get_mag, save_wav, bss_eval, Scorekeeper, get_batch_spec, combine_magnitude_phase, load_wavs, get_specs_transpose, prepare_data_full, wavs_to_specs, sperate_magnitude_phase
+# from preprocess import load_wavs, prepare_data_full, wavs_to_specs, sperate_magnitude_phase, combine_magnitdue_phase
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -61,8 +61,8 @@ def demo():
             y1_pred = y1_pred.cpu().numpy()
             y2_pred = y2_pred.cpu().numpy()
 
-            y1_stft_hat = combine_magnitdue_phase(magnitudes = y1_pred[0], phases = stft_mono_phase)
-            y2_stft_hat = combine_magnitdue_phase(magnitudes = y2_pred[0], phases = stft_mono_phase)
+            y1_stft_hat = combine_magnitude_phase(y1_pred[0], stft_mono_phase)
+            y2_stft_hat = combine_magnitude_phase(y2_pred[0], stft_mono_phase)
 
             y1_stft_hat = y1_stft_hat.transpose()
             y2_stft_hat = y2_stft_hat.transpose()

@@ -12,8 +12,8 @@ import os
 from mir_eval.separation import bss_eval_sources
 from model import R_pca, time_freq_masking, Model, separate_signal_with_RPCA
 from datasets import get_dataloader
-from utils import get_spec, get_angle, get_mag, save_wav, bss_eval, Scorekeeper, get_batch_spec, combine_mag_phase, load_wavs, get_specs_transpose
-from preprocess import load_wavs, prepare_data_full, wavs_to_specs, sperate_magnitude_phase, combine_magnitdue_phase
+from utils import get_spec, get_angle, get_mag, save_wav, bss_eval, Scorekeeper, get_batch_spec, combine_magnitude_phase, sperate_magnitude_phase, load_wavs, get_specs_transpose, wavs_to_specs, prepare_data_full
+# from preprocess import load_wavs, prepare_data_full, wavs_to_specs, sperate_magnitude_phase, combine_magnitdue_phase
 
 
 scorekeepr = Scorekeeper()
@@ -51,8 +51,8 @@ def eval_rnn():
             
             # iterate thru batch
             # for i in range(pred_s1.shape[0]):
-            pred_s1_wav = librosa.istft(combine_mag_phase(pred_s1[0], mixed_phase))
-            pred_s2_wav = librosa.istft(combine_mag_phase(pred_s2[0], mixed_phase))
+            pred_s1_wav = librosa.istft(combine_magnitude_phase(pred_s1[0], mixed_phase))
+            pred_s2_wav = librosa.istft(combine_magnitude_phase(pred_s2[0], mixed_phase))
 
             nsdr, sir, sar, lens = bss_eval(mixed[i], s1[i], s2[i], pred_s1_wav, pred_s2_wav)
             scorekeepr.update(nsdr, sir, sar, lens)
@@ -147,8 +147,8 @@ def eval():
             # ISTFT with the phase from mono
             y1_pred = y1_pred.cpu().numpy()
             y2_pred = y2_pred.cpu().numpy()
-            y1_stft_hat = combine_magnitdue_phase(magnitudes = y1_pred[0], phases = stft_mono_phase)
-            y2_stft_hat = combine_magnitdue_phase(magnitudes = y2_pred[0], phases = stft_mono_phase)
+            y1_stft_hat = combine_magnitude_phase(y1_pred[0], stft_mono_phase)
+            y2_stft_hat = combine_magnitude_phase(y2_pred[0], stft_mono_phase)
 
             y1_stft_hat = y1_stft_hat.transpose()
             y2_stft_hat = y2_stft_hat.transpose()
