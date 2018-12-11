@@ -26,13 +26,28 @@ def load_wavs(filenames, sr=16000):
 		s2_list.append(s2)
 	return mixed_list, s1_list, s2_list
 
-def combine_mag_phase(mag, phase, hop_length=256):
+def prepare_data_full(stfts_mono, stfts_src1, stfts_src2):
+
+    stfts_mono_full = list()
+    stfts_src1_full = list()
+    stfts_src2_full = list()
+
+    for stft_mono, stft_src1, stft_src2 in zip(stfts_mono, stfts_src1, stfts_src2):
+        stfts_mono_full.append(stft_mono.transpose())
+        stfts_src1_full.append(stft_src1.transpose())
+        stfts_src2_full.append(stft_src2.transpose())
+
+    return stfts_mono_full, stfts_src1_full, stfts_src2_full
+
+def combine_magnitude_phase(mag, phase, hop_length=256):
 	'''
 	using istft to reconstruct the wav format
 	'''
 	new_phase = np.exp(1.j * phase)
 
 	return mag*new_phase
+
+
 
 def get_spec(wav, n_fft=1024, window="hamming", hop_length=256):
 	return librosa.stft(wav, window=window, n_fft=n_fft, hop_length=hop_length)
