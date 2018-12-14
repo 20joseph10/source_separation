@@ -68,14 +68,14 @@ class BaselineModel(nn.Module):
 class BaselineModelTemp(nn.Module):
     def __init__(self, input_size, hidden_size, dropout=0.25):
         super(BaselineModelTemp, self).__init__()
-        self.rnn = nn.GRU(input_size, hidden_size, num_layers=3, batch_first=True, dropout=dropout)
+        self.rnn = nn.GRU(252, 128, num_layers=3, batch_first=True, dropout=dropout)
         self.linear1 = nn.Linear(hidden_size, input_size)
         self.linear2 = nn.Linear(hidden_size, input_size)
-        self.dropout = nn.Dropout(dropout)
+        # self.dropout = nn.Dropout(dropout)
 
-        self.rnn_cell1 = nn.GRUCell(input_size, hidden_size)
-        self.rnn_cell2 = nn.GRUCell(hidden_size, hidden_size)
-        self.rnn_cell3 = nn.GRUCell(hidden_size, hidden_size)
+        # self.rnn_cell1 = nn.GRUCell(input_size, hidden_size)
+        # self.rnn_cell2 = nn.GRUCell(hidden_size, hidden_size)
+        # self.rnn_cell3 = nn.GRUCell(hidden_size, hidden_size)
 
         # self.h = torch.randn(input_size, hidden_size)
 
@@ -83,34 +83,75 @@ class BaselineModelTemp(nn.Module):
         self.drop2 = nn.Dropout(dropout)
         # self.linear_mask1 = nn.Linear(input_size, input_size)
         # self.linear_mask2 = nn.Linear(input_size, input_size)
-        self.fc1 = nn.Linear(input_size, 256)
-        self.fc2 = nn.Linear(256, 128)
-        self.combine = nn.Linear(input_size+128, input_size)
+        
+        # conv
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=64, kernel_size=3)
+        self.pool1 = nn.MaxPool2d(kernel_size=2)
+
+        self.conv2_1 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3)
+        self.conv2_1x1 = nn.Conv2d(in_channels=64, out_channels=1, kernel_size=1)
+        self.conv2_1x1_2 = nn.Conv2d(in_channels=1, out_channels=64, kernel_size=1)
+        self.rnn_out_linear = nn.Linear(128, 252)
+        self.conv2_2 = nn.ConvTranspose2d(in_channels=64, out_channels=64, kernel_size=3)
+        self.conv3 = nn.ConvTranspose2d(in_channels=64, out_channels=1, kernel_size=3)
+
+        # self.conv4 = nn.ConvTranspose2d(in_channels=128, out_channels=128, kernel_size=3)
+        # self.linear_1x1 = nn.Linear()
+
+        
+        
+
     def forward(self, x):
         # print(x.shape)
-        x = self.dropout(x)
-        att = F.relu(self.fc1(x))
-        att = F.relu(self.fc2(att))
-        rnn_in = torch.cat((att, x), 2)
-        rnn_in = F.relu(self.combine(rnn_in))
-        output = []
-        for i in range(x.shape[1]):
-            if i == 0:
-                h1 = self.rnn_cell1(rnn_in[:,i,:])
-                h1 = self.drop1(h1)
-                h2_ = self.rnn_cell2(h1)
-                h2 = self.drop2(h2_)
-                h3 = self.rnn_cell3(h2)
-            else:
-                h1 = self.rnn_cell1(x[:,i,:])
-                h1 = self.drop1(h1)
-                h2_ = self.rnn_cell2(h1, h2_)
-                h2 = self.drop2(h2_)
-                h3 = self.rnn_cell3(h2)
+        # (batch size, channel 1, freq, time)
+        conv_input = x.permute(0,2,1).unsqueeze(1) #torch.Size([64, 1, 513, 64])
+        # print(conv_input.shape)
 
-            output.append(h3)
+        conv1 =  self.pool1(conv_input) # torch.Size([64, 1, 256, 32])
+        # print(conv1.shape)
 
-        output = torch.stack(output).permute(1,0,2)        # output = output + att
+        conv1 = self.conv1(conv1) #         torch.Size([64, 64, 254, 30])
+        # print(conv1.shape)
+        # print(conv1.shape)
+        conv2 = self.conv2_1(conv1)#         torch.Size([64, 128, 252, 28])
+        # print(conv2.shape)
+        
+        conv1_1 = self.conv2_1x1(conv2)
+        # rnn_in = conv1_1.squeeze(1).permute(0,2,1)
+        # # print(rnn_in.shape)
+        # output, _ = self.rnn(rnn_in)
+        # output = output
+        # output = self.rnn_out_linear(output) # 128 to 252
+        # output = output.permute(0,2,1).unsqueeze(1)
+        # output = self.conv2_1x1_2(output) # output: 64, 64, 252 28
+        # print(output.shape)
+        # print(rnn_out[0].shape)        
+
+        # print(conv2.shape)
+        conv2 = conv2 #+ output
+        conv2 = self.conv2_2(conv2)
+        
+        conv3 = self.conv3(conv2)
+        #upsample
+        conv3 = F.interpolate(conv3, scale_factor=2)
+        # print(conv3.shape)
+        # conv2 = conv2+output
+
+        # print(conv2.shape)
+
+        # conv3 = self.transposeConv3(conv2)
+        # print(conv3.shape)
+        # up1 = F.interpolate(conv3, scale_factor=2)
+        # print(up1.shape)
+
+
+        # print(conv3.shape)
+        # conv1x1 = self.conv1x1(conv2)
+        # print(conv1x1.shape)
+
+        output = conv3.squeeze(1).permute(0,2,1)
+        # print(output.shape)
+        # output = torch.stack(output).permute(1,0,2)        # output = output + att
         s1 = F.relu(self.linear1(output))
         s2 = F.relu(self.linear2(output))
 
