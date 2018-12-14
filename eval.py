@@ -97,7 +97,6 @@ def eval():
                 stft_mono_magnitude, stft_mono_phase = separate_magnitude_phase(data = stft_mono_full)
                 stft_mono_magnitude = np.array([stft_mono_magnitude])
 
-
                 stft_mono_magnitude = torch.Tensor(stft_mono_magnitude).to(device)
 
 
