@@ -74,12 +74,14 @@ def get_specs_transpose(mixed, s1, s2):
     s1_stft = list()
     s2_stft = list()
 
+
     for mix_, s1_, s2_ in zip(mixed, s1, s2):
         mixed_stft.append(get_spec(mix_).transpose())
         s1_stft.append(get_spec(s1_).transpose())
         s2_stft.append(get_spec(s2_).transpose())
 
     return mixed_stft, s1_stft, s2_stft
+
 
 
 def save_wav(filename, wav, sr=16000):
@@ -99,6 +101,7 @@ def bss_eval(mixed_wav, src1_wav, src2_wav, pred_src1_wav, pred_src2_wav):
                                           np.array([mixed_wav, mixed_wav]), compute_permutation=True)
     nsdr = sdr - sdr_mixed
     return nsdr, sir, sar, len
+
 
 
 

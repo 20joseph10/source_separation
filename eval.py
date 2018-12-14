@@ -24,7 +24,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 def bss_eval_global(wavs_mono, wavs_src1, wavs_src2, wavs_src1_pred, wavs_src2_pred):
-
+    print(len(wavs_mono), len(wavs_src1) , len(wavs_src2) , len(wavs_src1_pred) , len(wavs_src2_pred))
     assert len(wavs_mono) == len(wavs_src1) == len(wavs_src2) == len(wavs_src1_pred) == len(wavs_src2_pred)
 
     num_samples = len(wavs_mono)
@@ -57,13 +57,13 @@ def bss_eval_global(wavs_mono, wavs_src1, wavs_src2, wavs_src1_pred, wavs_src2_p
 
     return gnsdr, gsir, gsar
 
-def eval():
+def eval(args):
     mir1k_sr = 16000
     n_fft = 1024
     hop_length = n_fft // 4
     num_rnn_layer = 3
-    num_hidden_units = 1024
-    checkpoint = torch.load("experiment1/0/model_10000.pth")
+    num_hidden_units = args['hidden_size']
+    checkpoint = torch.load("final_model.pth")
 
     mir1k_dir = 'data/MIR1K/MIR-1K'
     test_path = os.path.join(mir1k_dir, 'test_temp.json')
@@ -74,9 +74,9 @@ def eval():
         # content = text_file.readlines()
     # wav_filenames = [file.strip() for file in content] 
     wav_filenames = ["{}/{}".format("data/MIR1K/MIR-1K/Wavfile", f) for f in content]
-
+    print(len(wav_filenames))
     split_size = int(len(wav_filenames)/5.)
-    model = BaselineModel(n_fft // 2 + 1, num_hidden_units).to(device)
+    model = BaselineModelTemp(n_fft // 2 , 512).to(device)
     model.load_state_dict(checkpoint["model_state_dict"])
     wavs_src1_pred = list()
     wavs_src2_pred = list()
@@ -88,15 +88,16 @@ def eval():
 
         stfts_mono, stfts_src1, stfts_src2 = wavs_to_specs(
             wavs_mono = wavs_mono, wavs_src1 = wavs_src1, wavs_src2 = wavs_src2, n_fft = n_fft, hop_length = hop_length)
-
         stfts_mono_full, stfts_src1_full, stfts_src2_full = prepare_data_full(stfts_mono = stfts_mono, stfts_src1 = stfts_src1, stfts_src2 = stfts_src2)
-        
+        # print(len(stfts_mono_full))
         with torch.no_grad():
             for wav_filename, wav_mono, stft_mono_full in zip(wav_filenames, wavs_mono, stfts_mono_full):
-
+                # print(stft_mono_full.shape)
                 stft_mono_magnitude, stft_mono_phase = separate_magnitude_phase(data = stft_mono_full)
-                stft_mono_magnitude = np.array([stft_mono_magnitude])
-
+                max_length_even = stft_mono_magnitude.shape[0]-1 if (stft_mono_magnitude.shape[0]%2 != 0) else stft_mono_magnitude.shape[0]
+                # print(stft_mono_magnitude.shape)
+                stft_mono_magnitude = np.array([stft_mono_magnitude[:max_length_even,:512]])
+                # print(stft_mono_magnitude.shape)
                 stft_mono_magnitude = torch.Tensor(stft_mono_magnitude).to(device)
 
 
@@ -105,14 +106,15 @@ def eval():
                 # ISTFT with the phase from mono
                 y1_pred = y1_pred.cpu().numpy()
                 y2_pred = y2_pred.cpu().numpy()
-                y1_stft_hat = combine_magnitdue_phase(magnitudes = y1_pred[0], phases = stft_mono_phase)
-                y2_stft_hat = combine_magnitdue_phase(magnitudes = y2_pred[0], phases = stft_mono_phase)
+                y1_stft_hat = combine_magnitdue_phase(magnitudes = y1_pred[0], phases = stft_mono_phase[:max_length_even, :512])
+                y2_stft_hat = combine_magnitdue_phase(magnitudes = y2_pred[0], phases = stft_mono_phase[:max_length_even, :512])
 
                 y1_stft_hat = y1_stft_hat.transpose()
                 y2_stft_hat = y2_stft_hat.transpose()
 
                 y1_hat = librosa.istft(y1_stft_hat, hop_length = hop_length)
                 y2_hat = librosa.istft(y2_stft_hat, hop_length = hop_length)
+
 
                 wavs_src1_pred.append(y1_hat)
                 wavs_src2_pred.append(y2_hat)
@@ -127,8 +129,10 @@ def eval():
 
 
 def main():
-    
-    eval()      
+    params_file = "./checkpoint/trial0/params.json"
+    with open(params_file, 'r') as f:
+        args = json.load(f)
+    eval(args)      
 
 if __name__ == "__main__":
     main()

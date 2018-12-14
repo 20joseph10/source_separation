@@ -87,16 +87,17 @@ def train_rnn(args):
     batch_size = 64
     iterations = 100000
 
-    trial_id = nni.get_sequence_id()
-    if not os.path.isdir('checkpoint'):
-        os.mkdir('checkpoint')
-    save_dir = 'checkpoint/trial'+str(trial_id) + "/"
-    os.makedirs(save_dir)
-    # store param in each trail (for testing)
-    with open(save_dir+"params.json", "w") as f:
-        json.dump(args, f)
-
-    train_log_filename = save_dir + 'train_log_temp.csv'
+    # trial_id = nni.get_sequence_id()
+    # if not os.path.isdir('checkpoint'):
+    #     os.mkdir('checkpoint')
+    # save_dir = 'checkpoint/trial'+str(trial_id) + "/"
+    # os.makedirs(save_dir)
+    # # store param in each trail (for testing)
+    # with open(save_dir+"params.json", "w") as f:
+    #     json.dump(args, f)
+    save_dir = "./"
+    # train_log_filename = save_dir + 'train_log_temp.csv'
+    train_log_filename ='train_log_temp.csv'
 
     # Load train wavs
     # Turn waves to spectrums
@@ -108,7 +109,7 @@ def train_rnn(args):
         
     # Initialize model
 
-    model = BaselineModel(n_fft // 2 + 1, num_hidden_units, dropout).to(device)
+    model = BaselineModelTemp(n_fft // 2 , 512, dropout).to(device)
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)    # 1645314
     loss_fn = nn.MSELoss().to(device)
     step = 1.
@@ -131,10 +132,11 @@ def train_rnn(args):
         optimizer.zero_grad()
         adjust_learning_rate(optimizer, i, learning_rate)
         
-        x_mixed = torch.Tensor(x_mixed).to(device)
-        y1 = torch.Tensor(y1).to(device)
-        y2 = torch.Tensor(y2).to(device)
+        max_length_even = x_mixed.shape[2]-1 if (x_mixed.shape[2]%2 != 0) else x_mixed.shape[2]
 
+        x_mixed = torch.Tensor(x_mixed[:,:,:max_length_even]).to(device)
+        y1 = torch.Tensor(y1[:,:,:max_length_even]).to(device)
+        y2 = torch.Tensor(y2[:,:,:max_length_even]).to(device)
         pred_s1, pred_s2 = model(x_mixed)
     
         loss = loss_fn(torch.cat((pred_s1, pred_s2), 1), torch.cat((y1, y2),1))#((y1-pred_s1)**2 + (y2-pred_s2)**2).sum()/y1.data.nelement()
@@ -163,14 +165,16 @@ def train_rnn(args):
                     x_mixed, _ = separate_magnitude_phase(data = mix_spec)
                     y1, _ = separate_magnitude_phase(data = s1_spec)
                     y2, _ = separate_magnitude_phase(data = s2_spec)
-                    x_mixed = torch.Tensor(x_mixed).unsqueeze(0).to(device)
-                    y1 = torch.Tensor(y1).unsqueeze(0).to(device)
-                    y2 = torch.Tensor(y2).unsqueeze(0).to(device)
+                    length = x_mixed.shape[0] - x_mixed.shape[0]%2
+                    # print(length)
+                    x_mixed = torch.Tensor(x_mixed[:length,:512]).unsqueeze(0).to(device)
+                    y1 = torch.Tensor(y1[:length,:512]).unsqueeze(0).to(device)
+                    y2 = torch.Tensor(y2[:length,:512]).unsqueeze(0).to(device)
                     
                     pred_s1, pred_s2 = model(x_mixed)
                     loss = ((y1-pred_s1)**2 + (y2-pred_s2)**2).sum()/y1.data.nelement()
                     val_losses += loss.cpu().numpy()
-            nni.report_intermediate_result(val_losses/val_len)
+            # nni.report_intermediate_result(val_losses/val_len)
             print("{}, {}, {}\n".format(i, total_loss/train_step, val_losses/len(mixed_stft)))
 
             with open(train_log_filename, "a") as f:
@@ -182,12 +186,12 @@ def train_rnn(args):
                 stop += 1
             if stop >= 2 and i >= 10000:
                 break
-            if i % 10000==0:
-                torch.save({
-                    'epoch': i,
-                    'model_state_dict': model.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                }, save_dir+"model_"+str(i)+".pth")
+            # if i % 10000==0:
+            torch.save({
+                'epoch': i,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+            }, save_dir+"model_"+str(i)+".pth")
             wavs_mono_valid, wavs_src1_valid, wavs_src2_valid = None, None, None
             mixed_stft, s1_stft, s2_stft = None, None, None
             random_wavs = np.random.choice(len(wav_filenames_train), len(wav_filenames_train), replace=False)
@@ -197,7 +201,7 @@ def train_rnn(args):
             wavs_mono = wavs_mono_train, wavs_src1 = wavs_src1_train, wavs_src2 = wavs_src2_train, n_fft = n_fft, hop_length = hop_length)
             train_step = 1.
             total_loss = 0.
-    nni.report_final_result(val_losses/val_len)
+    # nni.report_final_result(val_losses/val_len)
 
     torch.save({
             'epoch': i,
@@ -209,7 +213,7 @@ def generate_default_args():
     args = {
         'dropout': 0.25,
         'learning_rate': 0.0001,
-        'sample_frames': 10,
+        'sample_frames': 64,
         'hidden_size': 256,
         'num_layers': 3,
 
@@ -219,10 +223,10 @@ def generate_default_args():
 if __name__ == "__main__":
     
     try:
-        NEW_ARGS = nni.get_next_parameter()
+        # NEW_ARGS = nni.get_next_parameter()
         args = generate_default_args()
         print(nni.get_sequence_id())
-        args.update(NEW_ARGS)
+        # args.update(NEW_ARGS)
         print(args)
         train_rnn(args)
     except Exception as exception:
