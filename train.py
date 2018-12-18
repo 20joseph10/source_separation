@@ -13,8 +13,7 @@ from PIL import Image
 from matplotlib import cm
 
 
-from model import R_pca, time_freq_masking, BaselineModel, separate_signal_with_RPCA, BaselineModelTemp
-# from datasets import get_dataloader
+from model import SuperModel, EnsembleModel, R_pca, time_freq_masking, BaselineModel, separate_signal_with_RPCA, CNNRNNCNNModel, CNNRNNBaseline, EncoDecoderModelv2
 from utils import save_wav, Scorekeeper, load_wavs, combine_magnitdue_phase, get_specs, get_specs_transpose, wavs_to_specs, sample_data_batch, separate_magnitude_phase
 
 import nni
@@ -49,7 +48,7 @@ def adjust_learning_rate(optimizer, epoch, learning_rate):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
     if learning_rate <= 1e-5:
         return
-    lr = learning_rate * (0.1 ** (epoch // 10000))
+    lr = learning_rate * (0.1 ** (epoch // 5000))
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
@@ -106,7 +105,6 @@ def train_rnn(args):
 
     stfts_mono_train, stfts_src1_train, stfts_src2_train = wavs_to_specs(
     wavs_mono = wavs_mono_train, wavs_src1 = wavs_src1_train, wavs_src2 = wavs_src2_train, n_fft = n_fft, hop_length = hop_length)
-        
     # Initialize model
 
     model = BaselineModelTemp(n_fft // 2 , 512, dropout).to(device)
@@ -211,7 +209,7 @@ def train_rnn(args):
 
 def generate_default_args():
     args = {
-        'dropout': 0.25,
+        'dropout': 0.3,
         'learning_rate': 0.0001,
         'sample_frames': 64,
         'hidden_size': 256,
@@ -225,7 +223,7 @@ if __name__ == "__main__":
     try:
         # NEW_ARGS = nni.get_next_parameter()
         args = generate_default_args()
-        print(nni.get_sequence_id())
+        # print(nni.get_sequence_id())
         # args.update(NEW_ARGS)
         print(args)
         train_rnn(args)

@@ -27,11 +27,15 @@ def load_wavs(filenames, sr=16000):
     return mixed_list, s1_list, s2_list
 
 def separate_magnitude_phase(data):
-
+    """
+    return the mag value and phase of signal
+    """
     return np.abs(data), np.angle(data)
 
 def prepare_data_full(stfts_mono, stfts_src1, stfts_src2):
-
+    """
+    use for eval, transpose 
+    """
     stfts_mono_full = list()
     stfts_src1_full = list()
     stfts_src2_full = list()

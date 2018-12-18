@@ -11,7 +11,7 @@ import os
 
 from mir_eval.separation import bss_eval_sources
 
-from model import R_pca, time_freq_masking, BaselineModel, separate_signal_with_RPCA, BaselineModelTemp
+from model import EnsembleModel, R_pca, time_freq_masking, BaselineModel, separate_signal_with_RPCA, BaselineModelTemp, EncoDecoderModel, EncoDecoderModelv2
 # from datasets import get_dataloader
 from utils import separate_magnitude_phase, prepare_data_full, wavs_to_specs, save_wav, bss_eval, Scorekeeper, combine_magnitdue_phase, load_wavs, get_specs_transpose
 
@@ -63,7 +63,7 @@ def eval(args):
     hop_length = n_fft // 4
     num_rnn_layer = 3
     num_hidden_units = args['hidden_size']
-    checkpoint = torch.load("final_model.pth")
+    checkpoint = torch.load("model_10000.pth")
 
     mir1k_dir = 'data/MIR1K/MIR-1K'
     test_path = os.path.join(mir1k_dir, 'test_temp.json')
@@ -76,7 +76,7 @@ def eval(args):
     wav_filenames = ["{}/{}".format("data/MIR1K/MIR-1K/Wavfile", f) for f in content]
     print(len(wav_filenames))
     split_size = int(len(wav_filenames)/5.)
-    model = BaselineModelTemp(n_fft // 2 , 512).to(device)
+    model = EnsembleModel(n_fft // 2 , 512).to(device)
     model.load_state_dict(checkpoint["model_state_dict"])
     wavs_src1_pred = list()
     wavs_src2_pred = list()
@@ -95,19 +95,37 @@ def eval(args):
                 # print(stft_mono_full.shape)
                 stft_mono_magnitude, stft_mono_phase = separate_magnitude_phase(data = stft_mono_full)
                 max_length_even = stft_mono_magnitude.shape[0]-1 if (stft_mono_magnitude.shape[0]%2 != 0) else stft_mono_magnitude.shape[0]
-                # print(stft_mono_magnitude.shape)
                 stft_mono_magnitude = np.array([stft_mono_magnitude[:max_length_even,:512]])
                 # print(stft_mono_magnitude.shape)
                 stft_mono_magnitude = torch.Tensor(stft_mono_magnitude).to(device)
 
-
-                y1_pred, y2_pred = model(stft_mono_magnitude)
+                orig_length = max_length_even
+                # reminder = np.floor(orig_length / 64)
+                # print(64*reminder)
+                startIdx = 0
+                y1_pred_list = np.zeros((orig_length, 512), dtype=np.float32) # (batch, 512, 64)
+                y2_pred_list = np.zeros((orig_length, 512), dtype=np.float32)
+                while startIdx+64 < orig_length:
+                    y1_pred, y2_pred = model(stft_mono_magnitude[:, startIdx: startIdx+64, :])
 
                 # ISTFT with the phase from mono
-                y1_pred = y1_pred.cpu().numpy()
-                y2_pred = y2_pred.cpu().numpy()
-                y1_stft_hat = combine_magnitdue_phase(magnitudes = y1_pred[0], phases = stft_mono_phase[:max_length_even, :512])
-                y2_stft_hat = combine_magnitdue_phase(magnitudes = y2_pred[0], phases = stft_mono_phase[:max_length_even, :512])
+                    y1_pred = y1_pred.cpu().numpy()
+                    y2_pred = y2_pred.cpu().numpy()
+                    y1_pred_list[startIdx: startIdx+64, :] = y1_pred[0]
+                    y2_pred_list[startIdx: startIdx+64, :] = y2_pred[0]
+
+                    startIdx += 64
+                # calcualte things outside of 64 size blocks
+                # y1_pred, y2_pred = model(stft_mono_magnitude[:, startIdx: orig_length, :])
+
+                # y1_pred = y1_pred.cpu().numpy()
+                # y2_pred = y2_pred.cpu().numpy()
+                # y1_pred_list[startIdx: orig_length, :] = y1_pred[0]
+                # y2_pred_list[startIdx: orig_length, :] = y2_pred[0]
+
+
+                y1_stft_hat = combine_magnitdue_phase(magnitudes = y1_pred_list[:(startIdx),:], phases = stft_mono_phase[:(startIdx), :512])
+                y2_stft_hat = combine_magnitdue_phase(magnitudes = y2_pred_list[:(startIdx),:], phases = stft_mono_phase[:(startIdx), :512])
 
                 y1_stft_hat = y1_stft_hat.transpose()
                 y2_stft_hat = y2_stft_hat.transpose()

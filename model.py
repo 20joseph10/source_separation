@@ -39,8 +39,8 @@ class BaselineModel(nn.Module):
             if i == 0:
                 h1 = self.rnn_cell1(x[:,i,:])
                 h1 = self.drop1(h1)
-                h2_ = self.rnn_cell2(h1)
-                h2 = self.drop2(h2_)
+                h2 = self.rnn_cell2(h1)
+                h2 = self.drop2(h2)
                 h3 = self.rnn_cell3(h2)
             else:
                 h1 = self.rnn_cell1(x[:,i,:], h1)
@@ -64,94 +64,131 @@ class BaselineModel(nn.Module):
         s1 = mask1*x
         s2 = mask2*x
         return s1, s2
-
-class BaselineModelTemp(nn.Module):
-    def __init__(self, input_size, hidden_size, dropout=0.25):
-        super(BaselineModelTemp, self).__init__()
-        self.rnn = nn.GRU(252, 128, num_layers=3, batch_first=True, dropout=dropout)
-        self.linear1 = nn.Linear(hidden_size, input_size)
-        self.linear2 = nn.Linear(hidden_size, input_size)
-        # self.dropout = nn.Dropout(dropout)
-
+class SuperModel(nn.Module):
+    def __init__(self, input_size, hidden_size, dropout=0.4, num_layers=3):
+        super(SuperModel, self).__init__()
+        self.rnn = nn.GRU(382+512, hidden_size, num_layers=3, batch_first=True, dropout=dropout)
         # self.rnn_cell1 = nn.GRUCell(input_size, hidden_size)
         # self.rnn_cell2 = nn.GRUCell(hidden_size, hidden_size)
         # self.rnn_cell3 = nn.GRUCell(hidden_size, hidden_size)
+        self.num_layers = num_layers
+        self.drop1 = nn.Dropout(dropout)
+        self.drop2 = nn.Dropout(dropout)
+    
 
-        # self.h = torch.randn(input_size, hidden_size)
+        self.cnn_block1 = self.conv_block(1, 64, (1,3), dropout)
+        self.cnn_block2 = self.conv_block(64, 64, (1,3), dropout)
+        # self.cnn_block3 = self.conv_block(64, 64, (1,3), dropout)
+        
+        self.rnn_conv1 = nn.Conv2d(64, 1, 1)
+        self.rnn_conv2 = nn.Conv2d(64, 1, 1)
+        self.linear1 = nn.Linear(894, input_size)
+        self.linear2 = nn.Linear(894, input_size)
+        self.init_weights()
+
+    def conv_block(self, in_channels, out_channels, kernel_size, dropout):
+        return nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size, stride=(1,2)),
+            nn.PReLU(),
+            nn.Dropout(dropout))
+
+    def init_weights(self):
+        """
+        randomly initilize weights for linear layers
+        """
+        init_value = 0.1
+        self.linear1.weight.data.uniform_(-init_value, init_value)
+        self.linear2.weight.data.uniform_(-init_value, init_value)
+
+    def forward(self, x):
+        # feature extraction
+        conv_input = x.unsqueeze(1)
+        # conv_input = self.pool1(conv_input)
+        # print(conv_input.shape)
+        feat1 = self.cnn_block1(conv_input)
+        feat2 = self.cnn_block2(feat1)
+        # feat3 = self.cnn_block3(feat2)
+        # feat4 = self.cnn_block4(feat3)
+        # feat5 = self.cnn_block5(feat4)
+        # print(feat3.shape)
+        # concat
+        conv_cat = torch.cat((feat1, feat2, ), 3)
+        conv_cat_ = self.rnn_conv1(conv_cat)
+        
+        # print(conv_cat.shape)
+        rnn_in = torch.cat((conv_cat_.squeeze(1), x), 2)
+
+        # print(rnn_in.shape)
+        # rnn_in = self.rnn_conv1(feat5)
+        # print(rnn_in.shape)
+        output, states = self.rnn(rnn_in)
+        conv_out = self.rnn_conv2(conv_cat).squeeze(1)
+        final_cat = torch.cat((output, conv_out), 2)
+        # print(final_cat.shape)
+        # print(conv_out.shape)
+        # print(output.shape)
+        s1 = F.relu(self.linear1(final_cat))
+        s2 = F.relu(self.linear2(final_cat))
+
+        # soft time frequency mask
+        mask1 = torch.abs(s1) / (torch.abs(s1)+torch.abs(s2)+1e-16)
+        mask2 = torch.abs(s2) / (torch.abs(s1)+torch.abs(s2)+1e-16)
+        # # mask1 = self.linear_mask1(mask1) + mask1
+        # # mask2 = self.linear_mask2(mask2) + mask2 
+        s1 = mask1*x
+        s2 = mask2*x
+        return s1, s2
+class CNNRNNCNNModel(nn.Module):
+    def __init__(self, input_size, hidden_size, dropout=0.25):
+        super(CNNRNNCNNModel, self).__init__()
+        self.rnn = nn.GRU(252, 512, num_layers=3, batch_first=True, dropout=dropout)
+        self.linear1 = nn.Linear(hidden_size, input_size)
+        self.linear2 = nn.Linear(hidden_size, input_size)
 
         self.drop1 = nn.Dropout(dropout)
         self.drop2 = nn.Dropout(dropout)
-        # self.linear_mask1 = nn.Linear(input_size, input_size)
-        # self.linear_mask2 = nn.Linear(input_size, input_size)
         
         # conv
-        self.conv1 = nn.Conv2d(in_channels=1, out_channels=64, kernel_size=3)
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=256, kernel_size=3)
         self.pool1 = nn.MaxPool2d(kernel_size=2)
 
-        self.conv2_1 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3)
-        self.conv2_1x1 = nn.Conv2d(in_channels=64, out_channels=1, kernel_size=1)
-        self.conv2_1x1_2 = nn.Conv2d(in_channels=1, out_channels=64, kernel_size=1)
-        self.rnn_out_linear = nn.Linear(128, 252)
-        self.conv2_2 = nn.ConvTranspose2d(in_channels=64, out_channels=64, kernel_size=3)
-        self.conv3 = nn.ConvTranspose2d(in_channels=64, out_channels=1, kernel_size=3)
-
-        # self.conv4 = nn.ConvTranspose2d(in_channels=128, out_channels=128, kernel_size=3)
-        # self.linear_1x1 = nn.Linear()
-
+        self.conv2_1 = nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3)
+        self.conv2_1x1 = nn.Conv2d(in_channels=256, out_channels=1, kernel_size=1)
+        self.conv2_1x1_2 = nn.Conv2d(in_channels=1, out_channels=256, kernel_size=1)
+        self.rnn_out_linear = nn.Linear(512, 252)
+        self.conv2_2 = nn.ConvTranspose2d(in_channels=256, out_channels=256, kernel_size=3)
+        self.conv3 = nn.ConvTranspose2d(in_channels=256, out_channels=1, kernel_size=3)
         
         
 
     def forward(self, x):
-        # print(x.shape)
         # (batch size, channel 1, freq, time)
         conv_input = x.permute(0,2,1).unsqueeze(1) #torch.Size([64, 1, 513, 64])
-        # print(conv_input.shape)
 
         conv1 =  self.pool1(conv_input) # torch.Size([64, 1, 256, 32])
-        # print(conv1.shape)
+        conv1 = F.relu(self.conv1(conv1)) #         torch.Size([64, 64, 254, 30])
+        # conv1 = F.dropout(conv1, training=self.training)
+        conv2 = F.relu(self.conv2_1(conv1))#         torch.Size([64, 128, 252, 28])
+        conv1_1 = F.relu(self.conv2_1x1(conv2))
+        # conv1_1 = F.dropout(conv1_1, training=self.training)
+        rnn_in = conv1_1.squeeze(1).permute(0,2,1)
+        output, _ = self.rnn(rnn_in)
+        output = self.rnn_out_linear(output) # 128 to 252
+        output = output.permute(0,2,1).unsqueeze(1)
+        output = F.dropout(output, p=0.2, training=self.training)
 
-        conv1 = self.conv1(conv1) #         torch.Size([64, 64, 254, 30])
-        # print(conv1.shape)
-        # print(conv1.shape)
-        conv2 = self.conv2_1(conv1)#         torch.Size([64, 128, 252, 28])
-        # print(conv2.shape)
+        output = F.relu(self.conv2_1x1_2(output)) # add relu output: 64, 64, 252 28
+        # output = F.dropout(output, training=self.training)
+        conv2 = conv2 + output
+        conv2 = F.relu(self.conv2_2(conv2)) # add relu
+        conv2 = F.dropout(conv2, p=0.2, training=self.training)
         
-        conv1_1 = self.conv2_1x1(conv2)
-        # rnn_in = conv1_1.squeeze(1).permute(0,2,1)
-        # # print(rnn_in.shape)
-        # output, _ = self.rnn(rnn_in)
-        # output = output
-        # output = self.rnn_out_linear(output) # 128 to 252
-        # output = output.permute(0,2,1).unsqueeze(1)
-        # output = self.conv2_1x1_2(output) # output: 64, 64, 252 28
-        # print(output.shape)
-        # print(rnn_out[0].shape)        
-
-        # print(conv2.shape)
-        conv2 = conv2 #+ output
-        conv2 = self.conv2_2(conv2)
-        
-        conv3 = self.conv3(conv2)
-        #upsample
+        conv3 = F.relu(self.conv3(conv2)) # add relu
+        # conv3 = F.dropout(conv3, training=self.training)
         conv3 = F.interpolate(conv3, scale_factor=2)
-        # print(conv3.shape)
-        # conv2 = conv2+output
-
-        # print(conv2.shape)
-
-        # conv3 = self.transposeConv3(conv2)
-        # print(conv3.shape)
-        # up1 = F.interpolate(conv3, scale_factor=2)
-        # print(up1.shape)
-
-
-        # print(conv3.shape)
-        # conv1x1 = self.conv1x1(conv2)
-        # print(conv1x1.shape)
-
+        
         output = conv3.squeeze(1).permute(0,2,1)
-        # print(output.shape)
-        # output = torch.stack(output).permute(1,0,2)        # output = output + att
+        #print(output.shape)
         s1 = F.relu(self.linear1(output))
         s2 = F.relu(self.linear2(output))
 
@@ -163,22 +200,121 @@ class BaselineModelTemp(nn.Module):
         s1 = mask1*x
         s2 = mask2*x
         return s1, s2
-class EnsembleModel():
-    pass
 
-class EncoDecoderModel():
-    pass
+class CNNRNNBaseline(nn.Module):
+    def __init__(self, input_size, hidden_size, dropout=0.25):
+        super(CNNRNNBaseline, self).__init__()
+        self.rnn = nn.GRU(512, hidden_size, num_layers=3, batch_first=True, dropout=dropout)
+        self.linear1 = nn.Linear(hidden_size, input_size)
+        self.linear2 = nn.Linear(hidden_size, input_size)
+        
+        self.drop1 = nn.Dropout(dropout)
+        self.drop2 = nn.Dropout(dropout)
+        # self.linear_mask1 = nn.Linear(input_size, input_size)
+        # self.linear_mask2 = nn.Linear(input_size, input_size)
+        
+        # conv
+        self.pool1 = nn.MaxPool2d(kernel_size=(2,2))
 
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=256, kernel_size=(3,3))
+        self.conv2 = nn.ConvTranspose2d(in_channels=256, out_channels=1, kernel_size=(3,3))
+
+        
+        
+
+    def forward(self, x):
+        # print(x.shape)
+        # (batch size, channel 1, freq, time)
+        conv_input = x.permute(0,2,1).unsqueeze(1) #torch.Size([64, 1, 512, 64])
+        conv1 = self.pool1(conv_input) # 64, 1, 256, 32
+        # print(conv1.shape)
+        conv1 = F.relu(self.conv1(conv1)) # 64, 256, 254, 30
+        conv2 = F.relu(self.conv2(conv1)) # 64, 1, 256, 32
+        conv2 = F.interpolate(conv2, scale_factor=(2,2)) # 64, 1, 512, 64
+        rnn_in = conv2.squeeze(1).permute(0,2,1) # 64, 64, 512
+        # print(rnn_in.shape)
+        # idea, fn to combine original input and learned feature?
+        output, _ = self.rnn(rnn_in) # 64, 64, hidden_size
+        
+        # output = torch.stack(output).permute(1,0,2) # two ways to add skip, additive or concatenative
+        s1 = F.relu(self.linear1(output)) # 64, 64, 512
+        s2 = F.relu(self.linear2(output)) # 64, 64, 512
+
+        # soft time frequency mask
+        mask1 = torch.abs(s1) / (torch.abs(s1)+torch.abs(s2)+1e-16)
+        mask2 = torch.abs(s2) / (torch.abs(s1)+torch.abs(s2)+1e-16)
+        
+        s1 = mask1*x
+        s2 = mask2*x
+        return s1, s2
+
+class EncoDecoderModelv2(nn.Module):
+    def __init__(self, input_size, hidden_size, dropout=0.25):
+        super(EncoDecoderModelv2, self).__init__()
+        self.rnn = nn.GRU(512, hidden_size, num_layers=3, batch_first=True, dropout=dropout)
+        self.linear1 = nn.Linear(hidden_size, input_size)
+        self.linear2 = nn.Linear(hidden_size, input_size)
+        # self.dropout = nn.Dropout(dropout)
+
+        self.rnn_cell1 = nn.GRUCell(input_size, hidden_size)
+        self.rnn_cell2 = nn.GRUCell(hidden_size, hidden_size)
+        self.rnn_cell3 = nn.GRUCell(hidden_size, hidden_size)
+
+        # self.h = torch.randn(input_size, hidden_size)
+
+        self.drop1 = nn.Dropout(dropout)
+        self.drop2 = nn.Dropout(dropout)
+        # self.linear_mask1 = nn.Linear(input_size, input_size)
+        # self.linear_mask2 = nn.Linear(input_size, input_size)
+        
+        # conv
+        self.pool1 = nn.MaxPool2d(kernel_size=(2,2))
+
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=256, kernel_size=(3,3))
+        self.conv2 = nn.ConvTranspose2d(in_channels=256, out_channels=1, kernel_size=(3,3))
+        self.linear_cnn_x = nn.Linear(1024, 512)
+        self.linear_cnn_drop = nn.Dropout(dropout)
+        
+
+    def forward(self, x):
+        # print(x.shape)
+        # (batch size, channel 1, freq, time)
+        # print(x.shape)
+        conv_input = x.permute(0,2,1).unsqueeze(1) #torch.Size([64, 1, 512, 64])
+        conv1 = self.pool1(conv_input) # 64, 1, 256, 32
+        # print(conv1.shape)
+        conv1 = F.relu(self.conv1(conv1)) # 64, 256, 254, 30
+        conv2 = F.relu(self.conv2(conv1)) # 64, 1, 256, 32
+        conv2 = F.interpolate(conv2, scale_factor=(2,2)) # 64, 1, 512, 64
+        conv_out = conv2.squeeze(1).permute(0,2,1)
+        cnn_out = self.linear_cnn_drop(conv_out)
+        cnn_out = torch.cat((cnn_out, x), 2)
+        rnn_in = F.relu(self.linear_cnn_x(cnn_out))
+        
+        output, _ =self.rnn(rnn_in)
+        
+        s1 = F.relu(self.linear1(output)) # 64, 64, 512
+        s2 = F.relu(self.linear2(output)) # 64, 64, 512
+
+
+        # soft time frequency mask
+        mask1 = torch.abs(s1) / (torch.abs(s1)+torch.abs(s2)+1e-16)
+        mask2 = torch.abs(s2) / (torch.abs(s1)+torch.abs(s2)+1e-16)
+        
+        s1 = mask1*x
+        s2 = mask2*x
+        return s1, s2
+    
     
 
 def time_freq_masking(M_stft, L_hat, S_hat, gain=3):
-    mask = np.abs(S_hat) - gain * np.abs(L_hat)
-    mask = (mask > 0) * 1
-    # print(mask)
-    X_sing = np.multiply(mask, M_stft)
-    X_music = np.multiply(1 - mask, M_stft)
-    return X_sing, X_music
-
+    # mask = np.abs(S_hat) - gain * np.abs(L_hat)
+    # mask = (mask > 0) * 1
+    # # print(mask)
+    # X_sing = np.multiply(mask, M_stft)
+    # X_music = np.multiply(1 - mask, M_stft)
+    # return X_sing, X_music
+    pass
 class R_pca:
     def __init__(self, D, mu=None, lmbda=None):
         self.D = D
